@@ -517,6 +517,12 @@ HEAP_SETTINGS="$JAVA_HEAP_MAX $JAVA_OFFHEAP_MAX"
 export CLASSPATH
 
 if [ "${HBASE_NOEXEC}" != "" ]; then
+  echo "$JAVA -Dproc_$COMMAND -XX:OnOutOfMemoryError=kill -9 %p $HEAP_SETTINGS $HBASE_OPTS $CLASS $@"
+else
+  echo "$JAVA -Dproc_$COMMAND -XX:OnOutOfMemoryError=kill -9 %p $HEAP_SETTINGS $HBASE_OPTS $CLASS $@"
+fi
+
+if [ "${HBASE_NOEXEC}" != "" ]; then
   "$JAVA" -Dproc_$COMMAND -XX:OnOutOfMemoryError="kill -9 %p" $HEAP_SETTINGS $HBASE_OPTS $CLASS "$@"
 else
   exec "$JAVA" -Dproc_$COMMAND -XX:OnOutOfMemoryError="kill -9 %p" $HEAP_SETTINGS $HBASE_OPTS $CLASS "$@"

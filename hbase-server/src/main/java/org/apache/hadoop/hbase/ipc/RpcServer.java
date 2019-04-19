@@ -293,6 +293,13 @@ public abstract class RpcServer implements RpcServerInterface,
       this.minSizeForReservoirUse = Integer.MAX_VALUE;// reservoir itself not in place.
     }
     this.server = server;
+    //默认情况下包含以下几个services
+    //org.apache.hadoop.hbase.shaded.protobuf.generated.MasterProtos$MasterService$BlockingInterface
+    //org.apache.hadoop.hbase.shaded.protobuf.generated.RegionServerStatusProtos$RegionServerStatusService$BlockingInterface
+    //org.apache.hadoop.hbase.shaded.protobuf.generated.LockServiceProtos$LockService$BlockingInterface
+    //org.apache.hadoop.hbase.shaded.protobuf.generated.MasterProtos$HbckService$BlockingInterface
+    //org.apache.hadoop.hbase.shaded.protobuf.generated.ClientProtos$ClientService$BlockingInterface
+    //org.apache.hadoop.hbase.shaded.protobuf.generated.AdminProtos$AdminService$BlockingInterface
     this.services = services;
     this.bindAddress = bindAddress;
     this.conf = conf;
@@ -613,7 +620,7 @@ public abstract class RpcServer implements RpcServerInterface,
   }
 
   /**
-   * Helper for {@link #channelRead(java.nio.channels.ReadableByteChannel, java.nio.ByteBuffer).
+   * Helper for {@link #channelRead(java.nio.channels.ReadableByteChannel, java.nio.ByteBuffer)}.
    * Only one of readCh or writeCh should be non-null.
    *
    * @param readCh read channel

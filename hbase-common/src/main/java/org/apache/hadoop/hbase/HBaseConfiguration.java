@@ -63,6 +63,7 @@ public class HBaseConfiguration extends Configuration {
   }
 
   private static void checkDefaultsVersion(Configuration conf) {
+    //如果出现defaultsVersion 和 thisVersion 不一致的情况，可以在配置文件中添加以下配置省略检查
     if (conf.getBoolean("hbase.defaults.for.version.skip", Boolean.FALSE)) return;
     String defaultsVersion = conf.get("hbase.defaults.for.version");
     String thisVersion = VersionInfo.getVersion();
@@ -74,6 +75,7 @@ public class HBaseConfiguration extends Configuration {
   }
 
   public static Configuration addHbaseResources(Configuration conf) {
+    //默认添加hbase-default.xml 和 hbase-site.xml配置文件
     conf.addResource("hbase-default.xml");
     conf.addResource("hbase-site.xml");
 

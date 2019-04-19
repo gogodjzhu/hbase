@@ -1184,16 +1184,20 @@ public class RSRpcServices implements HBaseRPCErrorHandler,
     this(rs, DEFAULT_LOG_DELEGATE);
   }
 
+  //Master和RegionServer均使用本方法构造RPCServices
   // Directly invoked only for testing
   RSRpcServices(HRegionServer rs, LogDelegate ld) throws IOException {
     this.ld = ld;
+    //保留调用者regionServer的信息
     regionServer = rs;
     rowSizeWarnThreshold = rs.conf.getInt(BATCH_ROWS_THRESHOLD_NAME, BATCH_ROWS_THRESHOLD_DEFAULT);
     RpcSchedulerFactory rpcSchedulerFactory;
     try {
+      //允许通过配置文件修改rpc_scheduler_factory的实现类
       Class<?> cls = rs.conf.getClass(
           REGION_SERVER_RPC_SCHEDULER_FACTORY_CLASS,
           SimpleRpcSchedulerFactory.class);
+      //将类上转型成接口
       rpcSchedulerFactory = cls.asSubclass(RpcSchedulerFactory.class)
           .getDeclaredConstructor().newInstance();
     } catch (NoSuchMethodException | InvocationTargetException |
@@ -1204,13 +1208,16 @@ public class RSRpcServices implements HBaseRPCErrorHandler,
     InetSocketAddress initialIsa;
     InetSocketAddress bindAddress;
     if(this instanceof MasterRpcServices) {
+      //默认为本地ip
       String hostname = getHostname(rs.conf, true);
+      //默认为16000
       int port = rs.conf.getInt(HConstants.MASTER_PORT, HConstants.DEFAULT_MASTER_PORT);
       // Creation of a HSA will force a resolve.
       initialIsa = new InetSocketAddress(hostname, port);
       bindAddress = new InetSocketAddress(rs.conf.get("hbase.master.ipc.address", hostname), port);
     } else {
       String hostname = getHostname(rs.conf, false);
+      //默认为16020
       int port = rs.conf.getInt(HConstants.REGIONSERVER_PORT,
         HConstants.DEFAULT_REGIONSERVER_PORT);
       // Creation of a HSA will force a resolve.
@@ -1228,6 +1235,7 @@ public class RSRpcServices implements HBaseRPCErrorHandler,
         Address.fromParts(initialIsa.getHostName(), initialIsa.getPort()).toStringWithoutDomain();
     // Set how many times to retry talking to another server over Connection.
     ConnectionUtils.setServerSideHConnectionRetriesConfig(rs.conf, name, LOG);
+    // 创建rpcServer
     rpcServer = createRpcServer(rs, rs.conf, rpcSchedulerFactory, bindAddress, name);
     rpcServer.setRsRpcServices(this);
     scannerLeaseTimeoutPeriod = rs.conf.getInt(
@@ -1256,14 +1264,27 @@ public class RSRpcServices implements HBaseRPCErrorHandler,
         .expireAfterAccess(scannerLeaseTimeoutPeriod, TimeUnit.MILLISECONDS).build();
   }
 
+    /**
+     * 创建rpcServer实例
+     * @param server region Or master server
+     * @param conf
+     * @param rpcSchedulerFactory
+     * @param bindAddress
+     * @param name name of server to be created
+     * @return
+     * @throws IOException
+     */
   protected RpcServerInterface createRpcServer(Server server, Configuration conf,
       RpcSchedulerFactory rpcSchedulerFactory, InetSocketAddress bindAddress, String name)
       throws IOException {
     boolean reservoirEnabled = conf.getBoolean(RESERVOIR_ENABLED_KEY, true);
     try {
+      // getServices()方法获取server中需要处理的service(均为protobuf定义的service)
       return RpcServerFactory.createRpcServer(server, name, getServices(),
           bindAddress, // use final bindAddress for this server.
-          conf, rpcSchedulerFactory.create(conf, this, server), reservoirEnabled);
+          conf,
+          rpcSchedulerFactory.create(conf, this, server), /**默认rpcSchedulerFactory为{@link SimpleRpcSchedulerFactory}*/
+          reservoirEnabled);
     } catch (BindException be) {
       throw new IOException(be.getMessage() + ". To switch ports use the '"
           + HConstants.REGIONSERVER_PORT + "' configuration property.",
@@ -1502,6 +1523,8 @@ public class RSRpcServices implements HBaseRPCErrorHandler,
       getConfiguration().getBoolean(REGIONSERVER_ADMIN_SERVICE_CONFIG, true);
     boolean client =
       getConfiguration().getBoolean(REGIONSERVER_CLIENT_SERVICE_CONFIG, true);
+
+    //默认admin和client均为true，ClientService和AdminService均返回
     List<BlockingServiceAndInterface> bssi = new ArrayList<>();
     if (client) {
       bssi.add(new BlockingServiceAndInterface(

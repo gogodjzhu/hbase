@@ -1,6 +1,9 @@
 import protobf.SimpleProto;
 
+import com.google.protobuf.BlockingService;
 import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.RpcController;
+import com.google.protobuf.ServiceException;
 
 /**
  * Descriptions...
@@ -26,6 +29,38 @@ public class ProtoBufferTest {
         SimpleProto.PingEntity targetEntity = SimpleProto.PingEntity.parseFrom(bytes);
         System.out.println(targetEntity);
 
+        MyServer myServer = new MyServer();
+        BlockingService blockingService = SimpleProto.Ping2PongService
+                .newReflectiveBlockingService(new MyBlockingService(myServer));
+
+    }
+
+    private static class MyServer {
+
+        private SimpleProto.PongEntity.Builder builder = SimpleProto.PongEntity.newBuilder();
+
+        private SimpleProto.PongEntity doGet(SimpleProto.PingEntity pingEntity){
+            builder.clear();
+            builder.setId(pingEntity.getId());
+            builder.setStr("hello " + pingEntity.getStr());
+            return builder.build();
+        }
+
+
+    }
+
+    private static class MyBlockingService implements SimpleProto.Ping2PongService.BlockingInterface{
+
+        private MyServer server;
+
+        public MyBlockingService(MyServer server){
+            this.server = server;
+        }
+
+        @Override
+        public SimpleProto.PongEntity get(RpcController controller, SimpleProto.PingEntity request) throws ServiceException {
+            return this.server.doGet(request);
+        }
     }
 
 }

@@ -226,6 +226,22 @@ import org.apache.hadoop.hbase.shaded.protobuf.generated.WALProtos;
  *
  * <p>You can also shutdown just this master.  Call {@link #stopMaster()}.
  *
+ * <br />
+ * <br />
+ *
+ * HMaster 是HBase"master server"的实现类。
+ * 一个HBase集群同一时间只能有一个master，同时启动多个master将通过zk进行竞争上岗。竞争失败
+ * 的master将等待运行中master失去状态后，再次进行竞争。
+ *
+ * <p>master可以执行关闭集群操作。简单来说就是master通知所有的regionserver停止运行，并等待其
+ * 返回停止结果。完成后master再关闭自身。详见 {@link #shutdown()}。
+ *
+ * <p>也可以单独关闭master。详见 {@link #stopMaster()}
+ *
+ * <p/>
+ * <b>注意HMaster继承了HRegionServer, 所以Master可以执行HRegionServer的动作，比如保存表数
+ * 据，通过hbase.balancer.tablesOnMaster参数可以控制是否打开此功能，默认为false<b/>
+ *
  * @see org.apache.zookeeper.Watcher
  */
 @InterfaceAudience.LimitedPrivate(HBaseInterfaceAudience.TOOLS)
@@ -474,6 +490,7 @@ public class HMaster extends HRegionServer implements MasterServices {
    */
   public HMaster(final Configuration conf)
       throws IOException, KeeperException {
+    /** {@link HRegionServer#HRegionServer(Configuration)} */
     super(conf);
     TraceUtil.initTracer(conf);
     try {
@@ -3076,7 +3093,7 @@ public class HMaster extends HRegionServer implements MasterServices {
   }
 
   /**
-   * @see org.apache.hadoop.hbase.master.HMasterCommandLine
+   * 整个HBase Master的入口
    */
   public static void main(String [] args) {
     LOG.info("STARTING service " + HMaster.class.getSimpleName());

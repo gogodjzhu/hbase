@@ -55,6 +55,12 @@ import org.apache.hadoop.hbase.util.JVMClusterUtil;
  * that is 'local', not 'localhost', and the port number the master should use
  * instead of 16000.
  *
+ * <br/>
+ * <br/>
+ *
+ * 本类实现了一个单进程的HBase集群，通过多线程的方式来运行master&reginserver。master和每
+ * 个regionserver占用一个独立线程。
+ *
  */
 @InterfaceAudience.Public
 public class LocalHBaseCluster {
@@ -140,6 +146,7 @@ public class LocalHBaseCluster {
     this.conf = conf;
 
     // When active, if a port selection is default then we switch to random
+    // 随机端口，默认为false，按照配置文件的来
     if (conf.getBoolean(ASSIGN_RANDOM_PORTS, false)) {
       if (conf.getInt(HConstants.MASTER_PORT, HConstants.DEFAULT_MASTER_PORT)
           == HConstants.DEFAULT_MASTER_PORT) {
@@ -167,6 +174,10 @@ public class LocalHBaseCluster {
       }
     }
 
+    /**
+     * 实例化master(s)/regionserver(s)线程,并将线程分别添加到{@link LocalHBaseCluster#masterThreads}
+     * 和{@link LocalHBaseCluster#regionThreads} 等待启动
+     **/
     this.masterClass = (Class<? extends HMaster>)
       conf.getClass(HConstants.MASTER_IMPL, masterClass);
     // Start the HMasters.
@@ -219,6 +230,13 @@ public class LocalHBaseCluster {
     return addMaster(new Configuration(conf), this.masterThreads.size());
   }
 
+    /**
+     * 启动单个Master线程
+     * @param c
+     * @param index 标识符
+     * @return
+     * @throws IOException
+     */
   public JVMClusterUtil.MasterThread addMaster(Configuration c, final int index)
   throws IOException {
     // Create each master with its own Configuration instance so each has

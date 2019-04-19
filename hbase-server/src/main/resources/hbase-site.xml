@@ -6,4 +6,8 @@
         <name>hbase.defaults.for.version.skip</name>
         <value>true</value>
     </property>
+    <property>
+        <name>hbase.rpc.server.impl</name>
+        <value>org.apache.hadoop.hbase.ipc.SimpleRpcServer</value>
+    </property>
 </configuration>

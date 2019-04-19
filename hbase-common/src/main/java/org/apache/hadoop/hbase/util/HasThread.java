@@ -25,7 +25,7 @@ import org.apache.yetus.audience.InterfaceAudience;
  * Abstract class which contains a Thread and delegates the common Thread
  * methods to that instance.
  * 
- * The purpose of this class is to workaround Sun JVM bug #6915621, in which
+ * The purpose of this class is to workaround Sun JVM bug #6915621(Solved in jdk7b114), in which
  * something internal to the JDK uses Thread.currentThread() as a monitor
  * lock. This can produce deadlocks like HBASE-4367, HBASE-4101, etc.
  */

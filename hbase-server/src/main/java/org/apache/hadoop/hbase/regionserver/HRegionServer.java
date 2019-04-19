@@ -532,17 +532,23 @@ public class HRegionServer extends HasThread implements
       this.fsOk = true;
       this.masterless = conf.getBoolean(MASTERLESS_CONFIG_NAME, false);
       this.eventLoopGroupConfig = setupNetty(this.conf);
+      // 检查内存配置是否合法
       MemorySizeUtil.checkForClusterFreeHeapMemoryLimit(this.conf);
+      // HFile版本，此版本使用的是3
       HFile.checkHFileVersion(this.conf);
+      // 检查hbase.regionserver.codecs指定的(如果有)压缩工具lib是否存在
       checkCodecs(this.conf);
+      // 用户&权限管理对象
       this.userProvider = UserProvider.instantiate(conf);
+      // checksum校验
       FSUtils.setupShortCircuitRead(this.conf);
 
       // Disable usage of meta replicas in the regionserver
       this.conf.setBoolean(HConstants.USE_META_REPLICAS, false);
       // Config'ed params
+      // 以下是一些参数
       this.numRetries = this.conf.getInt(HConstants.HBASE_CLIENT_RETRIES_NUMBER,
-          HConstants.DEFAULT_HBASE_CLIENT_RETRIES_NUMBER);
+          HConstants.DEFAULT_HBASE_CLIENT_RETRIES_NUMBER); // 对于幂等操作的最大重试次数，默认15
       this.threadWakeFrequency = conf.getInt(HConstants.THREAD_WAKE_FREQUENCY, 10 * 1000);
       this.msgInterval = conf.getInt("hbase.regionserver.msginterval", 3 * 1000);
 
@@ -554,14 +560,15 @@ public class HRegionServer extends HasThread implements
       this.numRegionsToReport = conf.getInt("hbase.regionserver.numregionstoreport", 10);
 
       this.operationTimeout = conf.getInt(HConstants.HBASE_CLIENT_OPERATION_TIMEOUT,
-          HConstants.DEFAULT_HBASE_CLIENT_OPERATION_TIMEOUT);
+          HConstants.DEFAULT_HBASE_CLIENT_OPERATION_TIMEOUT); //客户端操作超时时间，优先级比numRetries高
 
       this.shortOperationTimeout = conf.getInt(HConstants.HBASE_RPC_SHORTOPERATION_TIMEOUT_KEY,
-          HConstants.DEFAULT_HBASE_RPC_SHORTOPERATION_TIMEOUT);
+          HConstants.DEFAULT_HBASE_RPC_SHORTOPERATION_TIMEOUT); //集群内部通信超时时间
 
       this.abortRequested = false;
       this.stopped = false;
 
+      //rpc 服务初始化
       rpcServices = createRpcServices();
       useThisHostnameInstead = getUseThisHostnameInstead(conf);
       String hostName =
@@ -579,16 +586,20 @@ public class HRegionServer extends HasThread implements
       login(userProvider, hostName);
       // init superusers and add the server principal (if using security)
       // or process owner as default super user.
+      // 超级用户
       Superusers.initialize(conf);
       regionServerAccounting = new RegionServerAccounting(conf);
 
+      //2.0.0版本之后master可以像reginoserver一样保存表数据(或者仅保存系统表)，通过参数来控制此功能打开与否，默认为false
       boolean isMasterNotCarryTable =
           this instanceof HMaster && !LoadBalancer.isTablesOnMaster(conf);
       // no need to instantiate global block cache when master not carry table
       if (!isMasterNotCarryTable) {
         CacheConfig.instantiateBlockCache(conf);
       }
+      //缓存配置
       cacheConfig = new CacheConfig(conf);
+      //mob(Medium Object)缓存配置
       mobCacheConfig = new MobCacheConfig(conf);
 
       uncaughtExceptionHandler = new UncaughtExceptionHandler() {
@@ -598,15 +609,18 @@ public class HRegionServer extends HasThread implements
         }
       };
 
+      //文件系统
       initializeFileSystem();
       spanReceiverHost = SpanReceiverHost.getInstance(getConfiguration());
 
       this.configurationManager = new ConfigurationManager();
+      //windows下的特殊配置
       setupWindows(getConfiguration(), getConfigurationManager());
 
       // Some unit tests don't need a cluster, so no zookeeper at all
-      if (!conf.getBoolean("hbase.testing.nocluster", false)) {
+      if (!conf.getBoolean("hbase.testing.nocluster", false)) { //cluster模式
         // Open connection to zookeeper and set primary watcher
+        // 创建zk连接，创建必须的zk路径，设置watcher到相应路径
         zooKeeper = new ZKWatcher(conf, getProcessName() + ":" +
           rpcServices.isa.getPort(), this, canCreateBaseZNode());
         // If no master in cluster, skip trying to track one or look for a cluster status.
@@ -622,11 +636,12 @@ public class HRegionServer extends HasThread implements
           masterAddressTracker = null;
           clusterStatusTracker = null;
         }
-      } else {
+      } else { //nocluster模式
         zooKeeper = null;
         masterAddressTracker = null;
         clusterStatusTracker = null;
       }
+      // 开启rpc服务
       this.rpcServices.start(zooKeeper);
       // This violates 'no starting stuff in Constructor' but Master depends on the below chore
       // and executor being created and takes a different startup route. Lots of overlap between HRS

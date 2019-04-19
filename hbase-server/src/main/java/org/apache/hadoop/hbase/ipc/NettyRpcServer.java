@@ -58,6 +58,7 @@ import org.apache.hadoop.security.authorize.ServiceAuthorizationManager;
 
 /**
  * An RPC server with Netty4 implementation.
+ * 是当前版本默认的rpcServer实现方案
  * @since 2.0.0
  */
 @InterfaceAudience.LimitedPrivate({HBaseInterfaceAudience.CONFIG})

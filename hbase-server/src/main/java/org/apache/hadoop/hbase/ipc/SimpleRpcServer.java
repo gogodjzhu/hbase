@@ -107,6 +107,17 @@ public class SimpleRpcServer extends RpcServer {
 
     private ExecutorService readPool;
 
+      /**
+       * 简单总结下Java NIO服务端的启动顺序:
+       * 1. {@link ServerSocketChannel#open()}
+       * 2. {@link Selector#open()}
+       * 3. {@link ServerSocketChannel#register(Selector, int)}
+       *
+       * //while(running)
+       * 4. {@link Selector#select()}
+       */
+
+
     public Listener(final String name) throws IOException {
       super(name);
       // The backlog of requests that we will have the serversocket carry.
@@ -127,6 +138,7 @@ public class SimpleRpcServer extends RpcServer {
       readers = new Reader[readThreads];
       // Why this executor thing? Why not like hadoop just start up all the threads? I suppose it
       // has an advantage in that it is easy to shutdown the pool.
+      // 这个哥们觉得使用线程池来启动固定数量的线程是为了方便关闭
       readPool = Executors.newFixedThreadPool(readThreads,
         new ThreadFactoryBuilder().setNameFormat(
           "Reader=%d,bindAddress=" + bindAddress.getHostName() +
@@ -300,6 +312,8 @@ public class SimpleRpcServer extends RpcServer {
       SocketChannel channel;
       while ((channel = server.accept()) != null) {
         channel.configureBlocking(false);
+        // tcp 协议为了合并多个小报文统一发送而设计的一个机制，关闭它使报文可以不等待立即发出
+        // 参考: https://blog.csdn.net/sunny_ss12/article/details/51509753
         channel.socket().setTcpNoDelay(tcpNoDelay);
         channel.socket().setKeepAlive(tcpKeepAlive);
         Reader reader = getReader();
@@ -359,6 +373,7 @@ public class SimpleRpcServer extends RpcServer {
 
     // The method that will return the next reader to work with
     // Simplistic implementation of round robin for now
+    // 并发时并不是严格地轮询使用
     Reader getReader() {
       currentReader = (currentReader + 1) % readers.length;
       return readers[currentReader];

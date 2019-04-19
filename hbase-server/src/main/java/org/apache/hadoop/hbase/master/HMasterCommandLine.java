@@ -155,16 +155,19 @@ public class HMasterCommandLine extends ServerCommandLine {
     try {
       // If 'local', defer to LocalHBaseCluster instance.  Starts master
       // and regionserver both in the one JVM.
+      // 集群模式可以为local/distributed, 通过hbase.cluster.distributed参数(默认为false即本地模式)来决定
       if (LocalHBaseCluster.isLocal(conf)) {
         DefaultMetricsSystem.setMiniClusterMode(true);
         final MiniZooKeeperCluster zooKeeperCluster = new MiniZooKeeperCluster(conf);
-        File zkDataPath = new File(conf.get(HConstants.ZOOKEEPER_DATA_DIR));
+        File zkDataPath = new File(conf.get(HConstants.ZOOKEEPER_DATA_DIR)); //默认为${hbase.tmp.dir}/zookeeper
 
         // find out the default client port
         int zkClientPort = 0;
 
         // If the zookeeper client port is specified in server quorum, use it.
-        String zkserver = conf.get(HConstants.ZOOKEEPER_QUORUM);
+        // 可以通过hbase.zookeeper.quorum指定host:port, 也可以单独指定host, 通过hbase.zookeeper.property.clientPort
+        // 来单独指定port
+        String zkserver = conf.get(HConstants.ZOOKEEPER_QUORUM); //默认为localhost
         if (zkserver != null) {
           String[] zkservers = zkserver.split(",");
 
@@ -201,6 +204,7 @@ public class HMasterCommandLine extends ServerCommandLine {
         }
 
         // login the zookeeper server principal (if using security)
+        // zk的kerberos验证，默认未开启
         ZKUtil.loginServer(conf, HConstants.ZK_SERVER_KEYTAB_FILE,
           HConstants.ZK_SERVER_KERBEROS_PRINCIPAL, null);
         int localZKClusterSessionTimeout =
@@ -223,13 +227,16 @@ public class HMasterCommandLine extends ServerCommandLine {
         int mastersCount = conf.getInt("hbase.masters", 1);
         int regionServersCount = conf.getInt("hbase.regionservers", 1);
         // Set start timeout to 5 minutes for cmd line start operations
+        // 启动时间超时配置，在断点看代码的时候可以换将此值调大
         conf.setIfUnset("hbase.master.start.timeout.localHBaseCluster", "300000");
         LOG.info("Starting up instance of localHBaseCluster; master=" + mastersCount +
           ", regionserversCount=" + regionServersCount);
         LocalHBaseCluster cluster = new LocalHBaseCluster(conf, mastersCount, regionServersCount,
           LocalHMaster.class, HRegionServer.class);
         ((LocalHMaster)cluster.getMaster(0)).setZKCluster(zooKeeperCluster);
+        // 启动集群
         cluster.startup();
+        // 等待集群环境关闭，至此完成整个集群的启动
         waitOnMasterThreads(cluster);
       } else {
         logProcessInfo(getConf());

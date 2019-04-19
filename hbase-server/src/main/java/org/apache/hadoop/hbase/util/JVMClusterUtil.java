@@ -129,6 +129,7 @@ public class JVMClusterUtil {
       final Class<? extends HMaster> hmc, final int index) throws IOException {
     HMaster server;
     try {
+      /** 默认情况下还是调用{@link HMaster#HMaster(Configuration)}执行实际操作 */
       server = hmc.getConstructor(Configuration.class).newInstance(c);
     } catch (InvocationTargetException ite) {
       Throwable target = ite.getTargetException();
@@ -174,18 +175,21 @@ public class JVMClusterUtil {
 
     for (JVMClusterUtil.MasterThread t : masters) {
       configuration = t.getMaster().getConfiguration();
+      /** 默认为{@link HMaster#run()} */
       t.start();
     }
 
     // Wait for an active master
     //  having an active master before starting the region threads allows
     //  then to succeed on their connection to master
+    // 等待active master
     final int startTimeout = configuration != null ? Integer.parseInt(
         configuration.get("hbase.master.start.timeout.localHBaseCluster", "30000")) : 30000;
     waitForEvent(startTimeout, "active", () -> findActiveMaster(masters) != null);
 
     if (regionservers != null) {
       for (JVMClusterUtil.RegionServerThread t: regionservers) {
+          /** 默认为{@link HRegionServer#run()}*/
         t.start();
       }
     }
