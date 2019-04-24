@@ -188,7 +188,7 @@ public class NioSocketDemo {
      * @param writeCh write channel
      * @param buf buffer to read or write into/out of
      * @return bytes written
-     * @throws java.io.IOException e
+     * @throws IOException e
      */
     private static int channelIO(ReadableByteChannel readCh,
                                  WritableByteChannel writeCh,
