@@ -1,0 +1,29 @@
+syntax = "proto2";
+
+package protobuf;
+option java_generic_services = true;
+
+message PingEntity{
+    required uint32 id = 1;
+    required uint32 opt = 2;
+    required string str = 3;
+    required PingType type = 4;
+    repeated string phone = 5;
+
+    enum PingType{
+        TYPE1 = 1;
+        TYPE2 = 2;
+        TYPE3 = 3;
+    }
+}
+
+message PongEntity{
+    required uint32 id = 1;
+    required string opt = 2;
+    required string str = 3;
+}
+
+service Ping2PongService{
+    rpc get(PingEntity)
+    returns(PongEntity);
+}

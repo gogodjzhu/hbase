@@ -1,4 +1,4 @@
-import protobf.SimpleProto;
+package protobuf;
 
 import com.google.protobuf.BlockingService;
 import com.google.protobuf.InvalidProtocolBufferException;
