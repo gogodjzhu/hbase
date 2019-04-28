@@ -92,6 +92,7 @@ public class SimpleRpcServer extends RpcServer {
   protected final long purgeTimeout;    // in milliseconds
 
   // maintains the set of client connections and handles idle timeouts
+  // 连接管理
   private ConnectionManager connectionManager;
   private Listener listener = null;
   protected SimpleRpcServerResponder responder = null;
@@ -124,6 +125,10 @@ public class SimpleRpcServer extends RpcServer {
       int backlogLength = conf.getInt("hbase.ipc.server.listen.queue.size", 128);
       readerPendingConnectionQueueLength =
           conf.getInt("hbase.ipc.server.read.connection-queue.size", 100);
+
+      /**
+       * !!!以下开始直接调用JavaNio方法建立网络监听
+       * */
       // Create a new server socket and set to non blocking mode
       acceptChannel = ServerSocketChannel.open();
       acceptChannel.configureBlocking(false);
@@ -152,6 +157,7 @@ public class SimpleRpcServer extends RpcServer {
       LOG.info(getName() + ": started " + readThreads + " reader(s) listening on port=" + port);
 
       // Register accepts on the server socket with the selector.
+      // 注册accept事件到selector，至此完成hbase rpc server的建立，剩下是在Thread.run()方法中遍历等待连接请求
       acceptChannel.register(selector, SelectionKey.OP_ACCEPT);
       this.setName("Listener,port=" + port);
       this.setDaemon(true);
@@ -200,7 +206,7 @@ public class SimpleRpcServer extends RpcServer {
                   doRead(key);
                 }
               }
-              key = null;
+              key = null; //方便gc回收
             }
           } catch (InterruptedException e) {
             if (running) {                      // unexpected -- log it
@@ -232,6 +238,7 @@ public class SimpleRpcServer extends RpcServer {
     public void run() {
       LOG.info(getName() + ": starting");
       connectionManager.startIdleScan();
+      //运行中，等待新的连接请求进来
       while (running) {
         SelectionKey key = null;
         try {
@@ -316,7 +323,9 @@ public class SimpleRpcServer extends RpcServer {
         // 参考: https://blog.csdn.net/sunny_ss12/article/details/51509753
         channel.socket().setTcpNoDelay(tcpNoDelay);
         channel.socket().setKeepAlive(tcpKeepAlive);
+        // 从reader池中获取一个reader处理当前请求
         Reader reader = getReader();
+        // 将channel注册到connectionManager。后者负责维护整个rpc服务的所有连接状态
         SimpleServerRpcConnection c = connectionManager.register(channel);
         // If the connectionManager can't take it, close the connection.
         if (c == null) {
@@ -325,7 +334,8 @@ public class SimpleRpcServer extends RpcServer {
           }
           continue;
         }
-        key.attach(c);  // so closeCurrentConnection can get the object
+        key.attach(c);  // so closeCurrentConnection can get the object // key.attachment().close()
+        /** 将connection添加到Reader对象去处理读请求，Reader线程的run()方法通过 {@link Reader#doRunLoop()}实际处理 */
         reader.addConnection(c);
       }
     }
@@ -416,6 +426,8 @@ public class SimpleRpcServer extends RpcServer {
   /**
    * Subclasses of HBaseServer can override this to provide their own
    * Connection implementations.
+   * 通过已经建立的socketChannel，获取RPCConnection对象。 后者提供了相关接口以更方便地使用channel
+   * @param time 修改时间
    */
   protected SimpleServerRpcConnection getConnection(SocketChannel channel, long time) {
     return new SimpleServerRpcConnection(this, channel, time);
@@ -442,8 +454,11 @@ public class SimpleRpcServer extends RpcServer {
     }
     this.authManager = new ServiceAuthorizationManager();
     HBasePolicyProvider.init(conf, authManager);
+    //启动线程
     responder.start();
+    //启动线程
     listener.start();
+    //启动线程
     scheduler.start();
     started = true;
   }

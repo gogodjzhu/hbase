@@ -235,6 +235,7 @@ public abstract class RpcExecutor {
 
   /**
    * Override if providing alternate Handler implementation.
+   * 默认提供了一个实现: {@link FastPathBalancedQueueRpcExecutor#getHandler(String, double, BlockingQueue, AtomicInteger)}
    */
   protected Handler getHandler(final String name, final double handlerFailureThreshhold,
       final BlockingQueue<CallRunner> q, final AtomicInteger activeHandlerCount) {
@@ -243,16 +244,26 @@ public abstract class RpcExecutor {
 
   /**
    * Start up our handlers.
+   * @param nameSuffix handler线程的前缀，在Executor存在多个队列时，不同队列内部的Handler通过前缀来区分彼此
+   * @param numHandlers handler数量
+   * @param callQueues Executor队列
+   * @param qindex 选择队列偏移量(读写分离队列通过此参数来区分不同段，每一段负责一个具体的读/写任务)
+   * @param qsize 队列总数(准确说应该是同一个类型的队列的总数)
+   * @param port 当前server监听的端口，用于线程命名方便区分
+   * @param activeHandlerCount 活跃的handler总数，所有handler之间共享
    */
   protected void startHandlers(final String nameSuffix, final int numHandlers,
       final List<BlockingQueue<CallRunner>> callQueues, final int qindex, final int qsize,
       final int port, final AtomicInteger activeHandlerCount) {
     final String threadPrefix = name + Strings.nullToEmpty(nameSuffix);
+
+    //TODO 失败比例，是handler执行任务的失败比例，还是Handler的失败比例
     double handlerFailureThreshhold = conf == null ? 1.0 : conf.getDouble(
       HConstants.REGION_SERVER_HANDLER_ABORT_ON_ERROR_PERCENT,
       HConstants.DEFAULT_REGION_SERVER_HANDLER_ABORT_ON_ERROR_PERCENT);
     for (int i = 0; i < numHandlers; i++) {
       final int index = qindex + (i % qsize);
+      //构造handler名称
       String name = "RpcServer." + threadPrefix + ".handler=" + handlers.size() + ",queue=" + index
           + ",port=" + port;
       Handler handler = getHandler(name, handlerFailureThreshhold, callQueues.get(index),

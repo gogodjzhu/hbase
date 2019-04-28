@@ -38,6 +38,7 @@ import org.junit.rules.TestName;
 /**
  * A silly test that does nothing but make sure an rpcscheduler factory makes what it says
  * it is going to make.
+ * 一个愚蠢的测试...
  */
 @Category(SmallTests.class)
 public class TestRpcSchedulerFactory {

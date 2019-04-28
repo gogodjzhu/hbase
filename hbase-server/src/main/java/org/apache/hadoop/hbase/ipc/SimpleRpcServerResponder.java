@@ -19,9 +19,12 @@ package org.apache.hadoop.hbase.ipc;
 
 import java.io.IOException;
 import java.nio.channels.CancelledKeyException;
+import java.nio.channels.Channel;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
+import java.nio.channels.ServerSocketChannel;
+import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
@@ -35,6 +38,7 @@ import org.apache.hadoop.util.StringUtils;
 
 /**
  * Sends responses of RPC back to clients.
+ * Responder负责发送server返回给client的响应
  */
 @InterfaceAudience.Private
 class SimpleRpcServerResponder extends Thread {
@@ -68,6 +72,7 @@ class SimpleRpcServerResponder extends Thread {
   }
 
   /**
+   * 将SelectionKey.OP_WRITE 事件注册到selector中
    * Take the list of the connections that want to write, and register them in the selector.
    */
   private void registerWrites() {
@@ -79,6 +84,7 @@ class SimpleRpcServerResponder extends Thread {
       try {
         if (sk == null) {
           try {
+            // 将connection作为attachment添加到key中
             c.channel.register(writeSelector, SelectionKey.OP_WRITE, c);
           } catch (ClosedChannelException e) {
             // ignore: the client went away.
@@ -107,7 +113,9 @@ class SimpleRpcServerResponder extends Thread {
     long lastPurgeTime = 0; // last check for old calls.
     while (this.simpleRpcServer.running) {
       try {
+        //将write事件注册到selector中
         registerWrites();
+        //等待新事件的到来
         int keyCt = writeSelector.select(this.simpleRpcServer.purgeTimeout);
         if (keyCt == 0) {
           continue;
@@ -203,6 +211,8 @@ class SimpleRpcServerResponder extends Thread {
       try {
         // We wrote everything, so we don't need to be told when the socket is ready for
         // write anymore.
+        // SelectorKey 维护两个bit集，一个是interest Set, 一个是ready Set
+        // 这里讲interest Set 置位为0，即全部不再关心
         key.interestOps(0);
       } catch (CancelledKeyException e) {
         /*

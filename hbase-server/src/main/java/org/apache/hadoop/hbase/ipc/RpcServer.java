@@ -206,6 +206,10 @@ public abstract class RpcServer implements RpcServerInterface,
   protected final Server server;
   protected final List<BlockingServiceAndInterface> services;
 
+  /**
+   * 此对象的实例:
+   * - 在simpleRPCService中使用 {@link org.apache.hadoop.hbase.regionserver.SimpleRpcSchedulerFactory}工厂创建{@link SimpleRpcScheduler}实例
+   * */
   protected final RpcScheduler scheduler;
 
   protected UserProvider userProvider;

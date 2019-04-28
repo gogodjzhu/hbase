@@ -451,7 +451,7 @@ abstract class ServerRpcConnection implements Closeable {
 
   public void processOneRpc(ByteBuff buf) throws IOException,
       InterruptedException {
-    if (connectionHeaderRead) {
+    if (connectionHeaderRead) { //请求头已经读取，则直接处理内容
       processRequest(buf);
     } else {
       processConnectionHeader(buf);
@@ -697,10 +697,13 @@ abstract class ServerRpcConnection implements Closeable {
     if (header.hasTimeout() && header.getTimeout() > 0) {
       timeout = Math.max(this.rpcServer.minClientRequestTimeout, header.getTimeout());
     }
+    // 构造请求对象
     ServerCall<?> call = createCall(id, this.service, md, header, param, cellScanner, totalRequestSize,
       this.addr, timeout, this.callCleanup);
 
+    // 交给scheduler计划执行
     if (!this.rpcServer.scheduler.dispatch(new CallRunner(this.rpcServer, call))) {
+      // 已满，记错
       this.rpcServer.callQueueSizeInBytes.add(-1 * call.getSize());
       this.rpcServer.metrics.exception(RpcServer.CALL_QUEUE_TOO_BIG_EXCEPTION);
       call.setResponse(null, null, RpcServer.CALL_QUEUE_TOO_BIG_EXCEPTION,

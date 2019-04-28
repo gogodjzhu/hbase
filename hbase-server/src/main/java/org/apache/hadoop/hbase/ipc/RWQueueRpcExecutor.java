@@ -43,6 +43,8 @@ import org.apache.hbase.thirdparty.com.google.protobuf.Message;
  * RPC Executor that uses different queues for reads and writes.
  * With the options to use different queues/executors for gets and scans.
  * Each handler has its own queue and there is no stealing.
+ * 使用读写分离队列，并且可以针对scan专门创建一个队列(可配置)
+ * 队列之间不可相互占用资源
  */
 @InterfaceAudience.LimitedPrivate({HBaseInterfaceAudience.COPROC, HBaseInterfaceAudience.PHOENIX})
 @InterfaceStability.Evolving

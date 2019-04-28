@@ -36,6 +36,12 @@ import org.apache.hadoop.hbase.conf.ConfigurationObserver;
 @InterfaceStability.Evolving
 public class SimpleRpcScheduler extends RpcScheduler implements ConfigurationObserver {
   private int port;
+  /**
+   * 默认情况
+   * RegionServer RPC {@link org.apache.hadoop.hbase.regionserver.AnnotationReadingPriorityFunction}
+   * Master RPC 使用  {@link org.apache.hadoop.hbase.master.MasterAnnotationReadingPriorityFunction}
+   * 后者继承自前者, 对master特有的一些请求进行了兼容
+   */
   private final PriorityFunction priority;
   private final RpcExecutor callExecutor;
   private final RpcExecutor priorityExecutor;
@@ -69,8 +75,10 @@ public class SimpleRpcScheduler extends RpcScheduler implements ConfigurationObs
       Abortable server,
       int highPriorityLevel) {
 
+    // 普通级队列最大长度
     int maxQueueLength = conf.getInt(RpcScheduler.IPC_SERVER_MAX_CALLQUEUE_LENGTH,
         handlerCount * RpcServer.DEFAULT_MAX_CALLQUEUE_LENGTH_PER_HANDLER);
+    // 优先级队列最大长度
     int maxPriorityQueueLength =
         conf.getInt(RpcScheduler.IPC_SERVER_PRIORITY_MAX_CALLQUEUE_LENGTH, maxQueueLength);
 
@@ -78,6 +86,7 @@ public class SimpleRpcScheduler extends RpcScheduler implements ConfigurationObs
     this.highPriorityLevel = highPriorityLevel;
     this.abortable = server;
 
+    // 队列类型，默认为fifo
     String callQueueType = conf.get(RpcExecutor.CALL_QUEUE_TYPE_CONF_KEY,
       RpcExecutor.CALL_QUEUE_TYPE_CONF_DEFAULT);
     float callqReadShare = conf.getFloat(RWQueueRpcExecutor.CALL_QUEUE_READ_SHARE_CONF_KEY, 0);
@@ -148,6 +157,7 @@ public class SimpleRpcScheduler extends RpcScheduler implements ConfigurationObs
 
   @Override
   public void start() {
+    // 启动Executor, 主要是启动Handlers, 入参port用于定义子线程的名字
     callExecutor.start(port);
     if (priorityExecutor != null) {
       priorityExecutor.start(port);

@@ -40,11 +40,21 @@ class SimpleServerCall extends ServerCall<SimpleServerRpcConnection> {
 
   @edu.umd.cs.findbugs.annotations.SuppressWarnings(value = "NP_NULL_ON_SOME_PATH",
       justification = "Can't figure why this complaint is happening... see below")
-  SimpleServerCall(int id, final BlockingService service, final MethodDescriptor md,
-      RequestHeader header, Message param, CellScanner cellScanner,
-      SimpleServerRpcConnection connection, long size,
-      final InetAddress remoteAddress, long receiveTime, int timeout, ByteBufferPool reservoir,
-      CellBlockBuilder cellBlockBuilder, CallCleanup reqCleanup, SimpleRpcServerResponder responder) {
+  SimpleServerCall(int id, // header.call_id
+                   final BlockingService service, //由protobuf定义，hbase实现的服务
+                   final MethodDescriptor md,
+                   RequestHeader header,
+                   Message param,
+                   CellScanner cellScanner,
+                   SimpleServerRpcConnection connection,
+                   long size,
+                   final InetAddress remoteAddress,
+                   long receiveTime,
+                   int timeout,
+                   ByteBufferPool reservoir,
+                   CellBlockBuilder cellBlockBuilder,
+                   CallCleanup reqCleanup,
+                   SimpleRpcServerResponder responder) {
     super(id, service, md, header, param, cellScanner, connection, size, remoteAddress,
         receiveTime, timeout, reservoir, cellBlockBuilder, reqCleanup);
     this.responder = responder;

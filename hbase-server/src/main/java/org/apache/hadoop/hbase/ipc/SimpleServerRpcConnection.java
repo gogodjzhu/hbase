@@ -45,15 +45,30 @@ import org.apache.hadoop.hbase.shaded.protobuf.ProtobufUtil;
 import org.apache.hadoop.hbase.shaded.protobuf.generated.RPCProtos.RequestHeader;
 import org.apache.hadoop.hbase.util.Pair;
 
-/** Reads calls from a connection and queues them for handling. */
+/** Reads calls from a connection and queues them for handling.
+ * <br>
+ * <p>
+ * 一个ServerRpcConnection的实现
+ * <p>
+ * 它是对已经建立的nio连接的一层封装
+ */
 @edu.umd.cs.findbugs.annotations.SuppressWarnings(value = "VO_VOLATILE_INCREMENT",
     justification = "False positive according to http://sourceforge.net/p/findbugs/bugs/1032/")
 @InterfaceAudience.Private
 class SimpleServerRpcConnection extends ServerRpcConnection {
 
   final SocketChannel channel;
+
+  /**
+   * 一个完整的报文依次包括三个部分: 报头(可选), 报文长度, 报文主体
+   * 三个部分分别通过以下三个Buffer进行缓存，具体解析方法在{@link this#readAndProcess()}
+   **/
+
+  // 此buffer保存实际报文数据
   private ByteBuff data;
+  // 此buffer长度为4(一个int类型)，
   private ByteBuffer dataLengthBuffer;
+  // 此buffer保存报头
   private ByteBuffer preambleBuffer;
   private final LongAdder rpcCount = new LongAdder(); // number of outstanding rpcs
   private long lastContact;
@@ -116,6 +131,11 @@ class SimpleServerRpcConnection extends ServerRpcConnection {
     rpcCount.increment();
   }
 
+  /**
+   * 处理报文头
+   * @return
+   * @throws IOException
+   */
   private int readPreamble() throws IOException {
     if (preambleBuffer == null) {
       preambleBuffer = ByteBuffer.allocate(6);
@@ -133,6 +153,11 @@ class SimpleServerRpcConnection extends ServerRpcConnection {
     return count;
   }
 
+  /**
+   * 读取
+   * @return
+   * @throws IOException
+   */
   private int read4Bytes() throws IOException {
     if (this.dataLengthBuffer.remaining() > 0) {
       return this.rpcServer.channelRead(channel, this.dataLengthBuffer);
@@ -144,12 +169,21 @@ class SimpleServerRpcConnection extends ServerRpcConnection {
   /**
    * Read off the wire. If there is not enough data to read, update the connection state with what
    * we have and returns.
+   * 报文结构:
+   * |----------|---------|---------------|
+   * |报头(可选) | 报文长度 |    报文内容    |
+   * |----------|---------|---------------|
+   *                      /               \
+   *                     | --------------------|
+   *                     | 请求头 |
+   *
    * @return Returns -1 if failure (and caller will close connection), else zero or more.
    * @throws IOException
    * @throws InterruptedException
    */
   public int readAndProcess() throws IOException, InterruptedException {
     // If we have not read the connection setup preamble, look to see if that is on the wire.
+    // 处理报头
     if (!connectionPreambleRead) {
       int count = readPreamble();
       if (!connectionPreambleRead) {
@@ -159,15 +193,19 @@ class SimpleServerRpcConnection extends ServerRpcConnection {
 
     // Try and read in an int. it will be length of the data to read (or -1 if a ping). We catch the
     // integer length into the 4-byte this.dataLengthBuffer.
+    // 处理报文长度
     int count = read4Bytes();
     if (count < 0 || dataLengthBuffer.remaining() > 0) {
+      //数据长度不足(remaining>0表示未填满4字节)或者数据长度为负异常，返回长度
       return count;
     }
 
     // We have read a length and we have read the preamble. It is either the connection header
     // or it is a request.
     if (data == null) {
+      // buffer切回读取模式
       dataLengthBuffer.flip();
+      // 获取报文长度
       int dataLength = dataLengthBuffer.getInt();
       if (dataLength == RpcClient.PING_CALL_ID) {
         if (!useWrap) { // covers the !useSasl too
@@ -180,6 +218,7 @@ class SimpleServerRpcConnection extends ServerRpcConnection {
             "Unexpected data length " + dataLength + "!! from " + getHostAddress());
       }
 
+      // 报文长度过长(maxRequestSize通过参数hbase.ipc.max.request.size指定, 默认256M)
       if (dataLength > this.rpcServer.maxRequestSize) {
         String msg = "RPC data length of " + dataLength + " received from " + getHostAddress() +
             " is greater than max allowed " + this.rpcServer.maxRequestSize + ". Set \"" +
@@ -207,15 +246,19 @@ class SimpleServerRpcConnection extends ServerRpcConnection {
           int headerSize = cis.readRawVarint32();
           Message.Builder builder = RequestHeader.newBuilder();
           ProtobufUtil.mergeFrom(builder, cis, headerSize);
+          //获取RPCProtos.RequestHeader
           RequestHeader header = (RequestHeader) builder.build();
 
           // Notify the client about the offending request
+          // 通知客户端，这条请求因为过长被拒绝了
           SimpleServerCall reqTooBig = new SimpleServerCall(header.getCallId(), this.service, null,
               null, null, null, this, 0, this.addr, System.currentTimeMillis(), 0,
               this.rpcServer.reservoir, this.rpcServer.cellBlockBuilder, null, responder);
+          //metrics 统计异常
           this.rpcServer.metrics.exception(SimpleRpcServer.REQUEST_TOO_BIG_EXCEPTION);
           // Make sure the client recognizes the underlying exception
           // Otherwise, throw a DoNotRetryIOException.
+           //通过版本号来判断客户端是否能识别req_too_big_exception, 如果不识别则使用DoNotRetryIOException代替
           if (VersionInfoUtil.hasMinimumVersion(connectionHeader.getVersionInfo(),
             RequestTooBigException.MAJOR_VERSION, RequestTooBigException.MINOR_VERSION)) {
             reqTooBig.setResponse(null, null, SimpleRpcServer.REQUEST_TOO_BIG_EXCEPTION, msg);
@@ -226,6 +269,7 @@ class SimpleServerRpcConnection extends ServerRpcConnection {
           // close the connection without writing out the reqTooBig response. Do not try to write
           // out directly here, and it will cause deserialization error if the connection is slow
           // and we have a half writing response in the queue.
+          // 发送响应给client
           reqTooBig.sendResponseIfReady();
         }
         // Close the connection
@@ -244,9 +288,11 @@ class SimpleServerRpcConnection extends ServerRpcConnection {
       incRpcCount();
     }
 
+    // 数据合法性校验完毕，将channel数据读入data
     count = channelDataRead(channel, data);
 
     if (count >= 0 && data.remaining() == 0) { // count==0 if dataLength == 0
+      // 处理data
       process();
     }
 
@@ -287,6 +333,7 @@ class SimpleServerRpcConnection extends ServerRpcConnection {
    * Process the data buffer and clean the connection state for the next call.
    */
   private void process() throws IOException, InterruptedException {
+    // data buffer切换为读状态
     data.rewind();
     try {
       if (skipInitialSaslHandshake) {
@@ -295,8 +342,10 @@ class SimpleServerRpcConnection extends ServerRpcConnection {
       }
 
       if (useSasl) {
+        // sasl模式rpc处理
         saslReadAndProcess(data);
       } else {
+        // 普通rpc模式处理
         processOneRpc(data);
       }
 

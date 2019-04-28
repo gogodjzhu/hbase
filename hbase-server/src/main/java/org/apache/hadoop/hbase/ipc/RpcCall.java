@@ -33,6 +33,9 @@ import org.apache.hadoop.hbase.shaded.protobuf.generated.RPCProtos.RequestHeader
 
 /**
  * Interface of all necessary to carry out a RPC method invocation on the server.
+ * 当前接口定义了server端创建rpc方法锁需要的方法
+ * RpcCall -> ServerCall -> SimpleServerCall
+ *                       \-> NettyServerCall
  */
 @InterfaceAudience.LimitedPrivate({HBaseInterfaceAudience.COPROC, HBaseInterfaceAudience.PHOENIX})
 @InterfaceStability.Evolving

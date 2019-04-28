@@ -34,6 +34,27 @@ import org.apache.yetus.audience.InterfaceAudience;
  * rather than let them go cold and lose context. Idea taken from Apace Kudu (incubating). See
  * https://gerrit.cloudera.org/#/c/2938/7/src/kudu/rpc/service_queue.h
  */
+ /**
+ * |----------------------------|
+ * |    {@link RpcExecutor}     |
+ * |----------------------------|
+ * |priority : PriorityFunction |
+ * |----------------------------|
+ *              ^
+ *              |
+ * |---------------------------------------|
+ * |    {@link BalancedQueueRpcExecutor}   |
+ * |---------------------------------------|
+ * |balancer : QueueBalancer               |
+ * |---------------------------------------|
+ *              ^
+ *              |
+ * |-----------------------------------------------|
+ * |    {@link FastPathBalancedQueueRpcExecutor}   |
+ * |-----------------------------------------------|
+ * |fastPathHandlerStack : Deque<FastPathHandler>  |
+ * |-----------------------------------------------|
+ */
 @InterfaceAudience.Private
 public class FastPathBalancedQueueRpcExecutor extends BalancedQueueRpcExecutor {
   // Depends on default behavior of BalancedQueueRpcExecutor being FIFO!
